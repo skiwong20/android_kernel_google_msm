@@ -102,5 +102,5 @@ config MSM_KGSL_SIMPLE_GOV
 	default y
 	depends on MSM_KGSL
 	---help---
-	  A simple KGSL GPU govenor for Qualcom Adreno XXX devices
+	  A simple KGSL GPU governor for Qualcom Adreno XXX devices
 
