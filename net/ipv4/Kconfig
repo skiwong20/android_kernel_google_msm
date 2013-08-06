@@ -163,6 +163,8 @@ config IP_PNP_RARP
 	  operating on your network. Read
 	  <file:Documentation/filesystems/nfs/nfsroot.txt> for details.
 
+# not yet ready..
+#   bool '    IP: ARP support' CONFIG_IP_PNP_ARP
 config NET_IPIP
 	tristate "IP: tunneling"
 	select INET_TUNNEL
@@ -407,14 +409,6 @@ config INET_TCP_DIAG
 	depends on INET_DIAG
 	def_tristate INET_DIAG
 
-config INET_UDP_DIAG
-	tristate "UDP: socket monitoring interface"
-	depends on INET_DIAG && (IPV6 || IPV6=n)
-	default n
-	---help---
-	  Support for UDP socket monitoring interface used by the ss tool.
-	  If unsure, say Y.
-
 menuconfig TCP_CONG_ADVANCED
 	bool "TCP: advanced congestion control"
 	---help---
@@ -444,7 +438,7 @@ config TCP_CONG_BIC
 
 config TCP_CONG_CUBIC
 	tristate "CUBIC TCP"
-	default y
+	default m
 	---help---
 	This is version 2.0 of BIC-TCP which uses a cubic growth function
 	among other techniques.
@@ -452,7 +446,7 @@ config TCP_CONG_CUBIC
 
 config TCP_CONG_WESTWOOD
 	tristate "TCP Westwood+"
-	default m
+	default y
 	---help---
 	TCP Westwood+ is a sender-side only modification of the TCP Reno
 	protocol stack that optimizes the performance of TCP congestion
@@ -617,7 +611,7 @@ config DEFAULT_TCP_CONG
 	default "westwood" if DEFAULT_WESTWOOD
 	default "veno" if DEFAULT_VENO
 	default "reno" if DEFAULT_RENO
-	default "cubic"
+	default "westwood"
 
 config TCP_MD5SIG
 	bool "TCP: MD5 Signature Option support (RFC2385) (EXPERIMENTAL)"
