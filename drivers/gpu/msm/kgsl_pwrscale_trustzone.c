@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -48,6 +48,10 @@ spinlock_t tz_lock;
  * per frame for 60fps content.
  */
 #define FLOOR			5000
+/* CEILING is 50msec, larger than any standard
+ * frame length, but less than the idle timer.
+ */
+#define CEILING			50000
 #define SWITCH_OFF		200
 #define SWITCH_OFF_RESET_TH	40
 #define SKIP_COUNTER		500
@@ -116,7 +120,7 @@ static ssize_t tz_governor_store(struct kgsl_device *device,
 		priv->governor = TZ_GOVERNOR_PERFORMANCE;
 
 	if (priv->governor == TZ_GOVERNOR_PERFORMANCE)
-		kgsl_pwrctrl_pwrlevel_change(device, pwr->max_pwrlevel);
+		kgsl_pwrctrl_pwrlevel_change(device, pwr->thermal_pwrlevel);
 
 	mutex_unlock(&device->mutex);
 	return count;
@@ -146,8 +150,6 @@ static void tz_wake(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 		kgsl_pwrctrl_pwrlevel_change(device,
 					device->pwrctrl.default_pwrlevel);
 }
-
-static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
 #define HISTORY_SIZE 10
@@ -194,8 +196,7 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
 }
 #endif
 
-static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale,
-						unsigned int ignore_idle)
+static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 	struct tz_priv *priv = pwrscale->priv;
@@ -234,18 +235,25 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale,
 		priv->no_switch_cnt = 0;
 	}
 
-	idle = priv->bin.total_time - priv->bin.busy_time;
+	/* If there is an extended block of busy processing,
+	 * increase frequency.  Otherwise run the normal algorithm.
+	 */
+	if (priv->bin.busy_time > CEILING) {
+		val = -1;
+	} else {
+		idle = priv->bin.total_time - priv->bin.busy_time;
+		idle = (idle > 0) ? idle : 0;
+#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
+		if (priv->governor == TZ_GOVERNOR_SIMPLE)
+			val = simple_governor(device, idle);
+		else
+			val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
+#else
+		val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
+#endif
+	}
 	priv->bin.total_time = 0;
 	priv->bin.busy_time = 0;
-	idle = (idle > 0) ? idle : 0;
-#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
-	if (priv->governor == TZ_GOVERNOR_SIMPLE)
-		val = simple_governor(device, idle);
-	else
-		val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
-#else
-	val = __secure_tz_entry(TZ_UPDATE_ID, idle, device->id);
-#endif
 	if (val) {
 		kgsl_pwrctrl_pwrlevel_change(device,
 					     pwr->active_pwrlevel + val);
@@ -271,10 +279,14 @@ static void tz_sleep(struct kgsl_device *device,
 	priv->bin.busy_time = 0;
 }
 
-#ifdef CONFIG_MSM_SCM
 static int tz_init(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
 	struct tz_priv *priv;
+
+	/* Trustzone is only valid for some SOCs */
+	if (!(cpu_is_msm8x60() || cpu_is_msm8960() || cpu_is_apq8064() ||
+		cpu_is_msm8930() || cpu_is_msm8930aa() || cpu_is_msm8627()))
+		return -EINVAL;
 
 	priv = pwrscale->priv = kzalloc(sizeof(struct tz_priv), GFP_KERNEL);
 	if (pwrscale->priv == NULL)
@@ -286,12 +298,6 @@ static int tz_init(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 
 	return 0;
 }
-#else
-static int tz_init(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
-{
-	return -EINVAL;
-}
-#endif /* CONFIG_MSM_SCM */
 
 static void tz_close(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
