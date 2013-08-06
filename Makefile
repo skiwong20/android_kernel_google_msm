@@ -354,8 +354,8 @@ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 CFLAGS_MODULE   =
 AFLAGS_MODULE   =
 LDFLAGS_MODULE  =
-CFLAGS_KERNEL	=
-AFLAGS_KERNEL	=
+CFLAGS_KERNEL	= -mtune=cortex-a15 -march=armv7-a -mfpu=neon -ftree-vectorize -pipe -Wno-attributes -Wno-maybe-uninitialized
+AFLAGS_KERNEL	= -mtune=cortex-a15 -march=armv7-a -mfpu=neon -ftree-vectorize -pipe -Wno-attributes -Wno-maybe-uninitialized
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 
