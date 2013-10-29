@@ -17,7 +17,6 @@
   #include <asm/memory.h>
 #endif
 
-around the problem of soft-booted kernel hangs due to improper device shutdown and/or reinitialization." More info in /arch/arm/Kconfig.
 /*
  * Debugging stuff
  *
